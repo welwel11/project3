@@ -1,12 +1,10 @@
 #!/bin/bash
 iser=$(cat /root/.isp)
 if [[ $iser -gt 0 ]]; then
-else
 echo ""
 fi
 
 iser1=$(cat /root/.city)
 if [[ $iser -gt 0 ]]; then
-else
 echo ""
 fi
