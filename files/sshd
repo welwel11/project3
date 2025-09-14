@@ -1,0 +1,44 @@
+# === OpenSSH Server Config (Ubuntu 22+ Support) ===
+# File: /etc/ssh/sshd_config
+
+Port 22
+Port 2222
+Port 2223
+#AddressFamily any
+#ListenAddress 0.0.0.0
+#ListenAddress ::
+
+# HostKeys (Ubuntu 22+ generate otomatis via ssh-keygen -A jika belum ada)
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+HostKey /etc/ssh/ssh_host_ed25519_key
+
+# Ciphers & keying (disarankan agar kompatibel modern OpenSSH)
+KexAlgorithms curve25519-sha256@libssh.org,diffie-hellman-group-exchange-sha256
+Ciphers aes256-gcm@openssh.com,chacha20-poly1305@openssh.com,aes256-ctr
+MACs hmac-sha2-512,hmac-sha2-256
+
+# Logging
+SyslogFacility AUTH
+LogLevel INFO
+
+# Authentication
+PermitRootLogin yes
+PasswordAuthentication yes
+ChallengeResponseAuthentication no
+UsePAM yes
+
+# Forwarding & misc
+AllowTcpForwarding yes
+X11Forwarding yes
+PrintMotd no
+
+# Keepalive (supaya koneksi stabil)
+ClientAliveInterval 120
+ClientAliveCountMax 3
+
+# Subsystem
+Subsystem sftp /usr/lib/openssh/sftp-server
+
+# Banner
+Banner /etc/kyt.txt

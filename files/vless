@@ -1,0 +1,78 @@
+#!/bin/bash
+# Auto limit VLESS quota (Ubuntu 22+ compatible)
+# Telegram notification removed
+
+function con() {
+    local -i bytes=$1;
+    if [[ $bytes -lt 1024 ]]; then
+        echo "${bytes}B"
+    elif [[ $bytes -lt 1048576 ]]; then
+        echo "$(( (bytes + 1023)/1024 ))KB"
+    elif [[ $bytes -lt 1073741824 ]]; then
+        echo "$(( (bytes + 1048575)/1048576 ))MB"
+    else
+        echo "$(( (bytes + 1073741823)/1073741824 ))GB"
+    fi
+}
+
+while true; do
+    sleep 5
+    data=( $(grep '^#&' /etc/xray/config.json | cut -d ' ' -f 2 | sort | uniq) )
+    
+    [[ ! -e /etc/limit/vless ]] && mkdir -p /etc/limit/vless
+
+    # Update traffic usage
+    for user in "${data[@]}"; do
+        xray api stats --server=127.0.0.1:10000 -name "user>>>${user}>>>traffic>>>downlink" >& /tmp/${user}
+        getThis=$(awk '{print $1}' /tmp/${user})
+
+        if [[ ${getThis} != "failed" ]]; then
+            downlink=$(xray api stats --server=127.0.0.1:10000 -name "user>>>${user}>>>traffic>>>downlink" \
+                        | grep -w "value" | awk '{print $2}' | cut -d '"' -f2)
+
+            if [[ -e /etc/limit/vless/${user} ]]; then
+                plus2=$(cat /etc/limit/vless/${user})
+                if [[ -n ${plus2} ]]; then
+                    echo $(( downlink + plus2 )) > /etc/limit/vless/${user}
+                else
+                    echo "${downlink}" > /etc/limit/vless/${user}
+                fi
+            else
+                echo "${downlink}" > /etc/limit/vless/${user}
+            fi
+            # reset counter biar akumulasi benar
+            xray api stats --server=127.0.0.1:10000 -name "user>>>${user}>>>traffic>>>downlink" -reset >/dev/null 2>&1
+        fi
+    done
+
+    # Check user quota
+    for user in "${data[@]}"; do
+        if [[ -e /etc/vless/${user} ]]; then
+            checkLimit=$(cat /etc/vless/${user})
+            if [[ -n ${checkLimit} && -e /etc/limit/vless/${user} ]]; then
+                Usage=$(cat /etc/limit/vless/${user})
+                if (( Usage > checkLimit )); then
+                    total=$(con ${Usage})
+                    total2=$(con ${checkLimit})
+                    exp=$(grep -w "^#& $user" "/etc/xray/config.json" | cut -d ' ' -f 3 | sort | uniq)
+
+                    # Hapus akun user dari config.json
+                    sed -i "/^#& $user $exp/,/^},{/d" /etc/xray/config.json
+                    sed -i "/^#& $user $exp/d" /etc/vless/.vless.db
+
+                    # Bersih-bersih file user
+                    rm -f /etc/kyt/limit/vless/ip/$user
+                    rm -f /etc/vless/$user
+                    rm -f /etc/limit/vless/$user
+                    rm -f /etc/limit/vless/quota/$user
+                    rm -f /var/www/html/vless-$user.txt
+
+                    # Restart xray agar config update
+                    systemctl restart xray >/dev/null 2>&1
+
+                    echo "[INFO] User $user locked (usage: $total / limit: $total2)"
+                fi
+            fi
+        fi
+    done
+done

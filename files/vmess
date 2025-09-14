@@ -1,0 +1,83 @@
+#!/bin/bash
+# Auto Lock VMESS User by Quota (Ubuntu 22+)
+# Telegram notification removed
+
+function con() {
+    local -i bytes=$1;
+    if [[ $bytes -lt 1024 ]]; then
+        echo "${bytes}B"
+    elif [[ $bytes -lt 1048576 ]]; then
+        echo "$(( (bytes + 1023)/1024 ))KB"
+    elif [[ $bytes -lt 1073741824 ]]; then
+        echo "$(( (bytes + 1048575)/1048576 ))MB"
+    else
+        echo "$(( (bytes + 1073741823)/1073741824 ))GB"
+    fi
+}
+
+while true; do
+    sleep 5
+    data=( $(grep '^###' /etc/xray/config.json | cut -d ' ' -f 2 | sort | uniq) )
+
+    [[ ! -e /etc/limit/vmess ]] && mkdir -p /etc/limit/vmess
+
+    # Update penggunaan user
+    for user in "${data[@]}"; do
+        xray api stats --server=127.0.0.1:10000 \
+            -name "user>>>${user}>>>traffic>>>downlink" >& /tmp/${user}
+        getThis=$(awk '{print $1}' /tmp/${user})
+
+        if [[ ${getThis} != "failed" ]]; then
+            downlink=$(xray api stats --server=127.0.0.1:10000 \
+                        -name "user>>>${user}>>>traffic>>>downlink" \
+                        | grep -w "value" | awk '{print $2}' | cut -d '"' -f2)
+
+            if [[ -e /etc/limit/vmess/${user} ]]; then
+                plus2=$(cat /etc/limit/vmess/${user})
+                if [[ -n ${plus2} ]]; then
+                    echo $(( downlink + plus2 )) > /etc/limit/vmess/${user}
+                else
+                    echo "${downlink}" > /etc/limit/vmess/${user}
+                fi
+            else
+                echo "${downlink}" > /etc/limit/vmess/${user}
+            fi
+            # reset counter biar akumulasi benar
+            xray api stats --server=127.0.0.1:10000 \
+                -name "user>>>${user}>>>traffic>>>downlink" -reset >/dev/null 2>&1
+        fi
+    done
+
+    # Cek limit user
+    for user in "${data[@]}"; do
+        if [[ -e /etc/vmess/${user} ]]; then
+            checkLimit=$(cat /etc/vmess/${user})
+            if [[ -n ${checkLimit} && -e /etc/limit/vmess/${user} ]]; then
+                Usage=$(cat /etc/limit/vmess/${user})
+                total=$(con ${Usage})
+                total2=$(con ${checkLimit})
+
+                if (( Usage > checkLimit )); then
+                    exp=$(grep -w "^### $user" "/etc/xray/config.json" \
+                          | cut -d ' ' -f 3 | sort | uniq)
+
+                    # hapus user di config.json
+                    sed -i "/^### $user $exp/,/^},{/d" /etc/xray/config.json
+                    sed -i "/^### $user $exp/d" /etc/vmess/.vmess.db
+
+                    # bersihkan file limit
+                    rm -rf /etc/limit/vmess/$user
+                    rm -f /etc/kyt/limit/vmess/ip/$user
+                    rm -f /etc/vmess/$user
+                    rm -f /etc/limit/vmess/$user
+                    rm -f /etc/limit/vmess/quota/$user
+                    rm -f /var/www/html/vmess-$user.txt
+
+                    systemctl restart xray >/dev/null 2>&1
+
+                    echo "[INFO] User $user locked (usage: $total / limit: $total2)"
+                fi
+            fi
+        fi
+    done
+done
