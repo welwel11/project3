@@ -1,0 +1,99 @@
+#!/bin/bash
+# Simple bzip2-based script encrypter (support Ubuntu 22+)
+
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+PURPLE='\033[0;35m'
+CYAN='\033[0;36m'
+NC='\033[0m'
+
+x=$(basename "$0")
+
+if [[ $# -eq 0 ]]; then
+  echo  "          ${PURPLE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo  "          ${RED}#----------------------${NC}${GREEN}[MENU  ENCRYPTER]${NC}${RED}--------------------#${NC}"
+  echo  "          ${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  echo  "          ${RED}#${NC}            ${GREEN} USAGE : ketik enc spasi namafile${NC}             ${RED} #${NC}"
+  echo  "          ${YELLOW}-------------------------------------------------------------${NC}"
+  echo  "          ${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+  exit 1
+fi
+
+set -C
+tmp=$(mktemp /tmp/gzXXXXXX) || exit 1
+trap "rm -f $tmp; exit 1" HUP INT QUIT TERM
+
+decomp=0
+res=0
+[[ "$x" == "ungzexe" ]] && decomp=1
+if [[ "$1" == "-d" ]]; then
+  decomp=1
+  shift
+fi
+
+# pakai tail modern
+TAIL="tail -n"
+if ! echo foo | tail -n +1 >/dev/null 2>&1; then
+  echo "Error: tail tidak support -n +N"
+  exit 1
+fi
+
+for i in "$@"; do
+  if [[ ! -f "$i" ]]; then
+    echo "$x: $i not a file"
+    res=1
+    continue
+  fi
+
+  if [[ $decomp -eq 0 ]]; then
+    if sed -e 1d -e 2q "$i" | grep -q "^skip=[0-9]*$"; then
+      echo "$x: $i is already encrypted"
+      continue
+    fi
+  fi
+
+  if [[ $decomp -eq 0 ]]; then
+    sed 1q "$0" > "$tmp"
+    sed "s|^if tail|if $TAIL|" >> "$tmp" <<'EOF'
+skip=23
+set -C
+umask=$(umask)
+umask 77
+tmpfile=$(mktemp /tmp/gztmp.XXXXXX) || exit 1
+if tail -n +$skip "$0" | bzip2 -cd >> "$tmpfile"; then
+  umask $umask
+  chmod 700 "$tmpfile"
+  prog=$(basename "$0")
+  trap 'rm -f "$tmpfile"; exit $res' 0
+  "$tmpfile" "$@"; res=$?
+else
+  echo "Cannot decompress $0"; exit 1
+fi
+exit $res
+EOF
+    bzip2 -cv9 "$i" >> "$tmp" || {
+      rm -f "$tmp"
+      echo "$x: compression not possible for $i, file unchanged."
+      res=1
+      continue
+    }
+  else
+    # decryption
+    skip=23
+    if sed -e 1d -e 2q "$i" | grep -q "^skip=[0-9]*$"; then
+      eval "$(sed -e 1d -e 2q "$i")"
+    fi
+    if ! tail -n +$skip "$i" | bzip2 -cd > "$tmp"; then
+      echo "$x: $i probably not in enc format, file unchanged."
+      res=1
+      continue
+    fi
+  fi
+
+  mv "$i" "$i~" || { echo "$x: cannot backup $i"; rm -f "$tmp"; continue; }
+  mv "$tmp" "$i"
+done
+
+exit $res
