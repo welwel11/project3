@@ -1,0 +1,17 @@
+[Unit]
+Description=Limit Usage Xray Service
+Documentation=FighterTunnel
+After=network-online.target syslog.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+ExecStart=/etc/xray/limit.trojan
+Restart=always
+RestartSec=5s
+NoNewPrivileges=true
+LimitNOFILE=65535
+
+[Install]
+WantedBy=multi-user.target
