@@ -1,0 +1,79 @@
+#!/bin/bash
+# Script Limitasi Multi Login (Support Ubuntu 22+)
+set -euo pipefail
+
+# ──────────────────────────────
+# Fungsi Cek Limit VMESS
+# ──────────────────────────────
+vmip() {
+    : > /var/log/xray/access.log
+    sleep 1
+    local data=($(ls /etc/kyt/limit/vmess/ip))
+    for user in "${data[@]}"; do
+        iplimit=$(< /etc/kyt/limit/vmess/ip/$user)
+        ehh=$(grep "$user" /var/log/xray/access.log | awk '{print $3}' | sed 's/tcp:\/\///' | cut -d ":" -f1 | sort -u)
+        cekcek=$(echo -e "$ehh" | wc -l)
+        if [[ $cekcek -gt $iplimit ]]; then
+            exp=$(awk -v u="$user" '$2==u {print $3}' /etc/xray/config.json | sort -u)
+            sed -i "/^### $user $exp/,/^},{/d" /etc/xray/config.json
+            sed -i "/^### $user $exp/d" /etc/vmess/.vmess.db
+            systemctl restart xray >/dev/null 2>&1
+            rm -f /etc/kyt/limit/vmess/ip/$user
+        fi
+        sleep 0.1
+    done
+}
+
+# ──────────────────────────────
+# Fungsi Cek Limit VLESS
+# ──────────────────────────────
+vlip() {
+    : > /var/log/xray/access.log
+    sleep 1
+    local data=($(ls /etc/kyt/limit/vless/ip))
+    for user in "${data[@]}"; do
+        iplimit=$(< /etc/kyt/limit/vless/ip/$user)
+        ehh=$(grep "$user" /var/log/xray/access.log | awk '{print $3}' | sed 's/tcp:\/\///' | cut -d ":" -f1 | sort -u)
+        cekcek=$(echo -e "$ehh" | wc -l)
+        if [[ $cekcek -gt $iplimit ]]; then
+            exp=$(awk -v u="$user" '$2==u {print $3}' /etc/xray/config.json | sort -u)
+            sed -i "/^#& $user $exp/,/^},{/d" /etc/xray/config.json
+            sed -i "/^### $user $exp/d" /etc/vless/.vless.db
+            systemctl restart xray >/dev/null 2>&1
+            rm -f /etc/kyt/limit/vless/ip/$user
+        fi
+        sleep 0.1
+    done
+}
+
+# ──────────────────────────────
+# Fungsi Cek Limit TROJAN
+# ──────────────────────────────
+trip() {
+    : > /var/log/xray/access.log
+    sleep 1
+    local data=($(ls /etc/kyt/limit/trojan/ip))
+    for user in "${data[@]}"; do
+        iplimit=$(< /etc/kyt/limit/trojan/ip/$user)
+        ehh=$(grep "$user" /var/log/xray/access.log | awk '{print $3}' | sed 's/tcp:\/\///' | cut -d ":" -f1 | sort -u)
+        cekcek=$(echo -e "$ehh" | wc -l)
+        if [[ $cekcek -gt $iplimit ]]; then
+            exp=$(awk -v u="$user" '$2==u {print $3}' /etc/xray/config.json | sort -u)
+            sed -i "/^#! $user $exp/,/^},{/d" /etc/xray/config.json
+            sed -i "/^### $user $exp/d" /etc/trojan/.trojan.db
+            systemctl restart xray >/dev/null 2>&1
+            rm -f /etc/kyt/limit/trojan/ip/$user
+        fi
+        sleep 0.1
+    done
+}
+
+# ──────────────────────────────
+# Main
+# ──────────────────────────────
+case "${1:-}" in
+    vmip) vmip ;;
+    vlip) vlip ;;
+    trip) trip ;;
+    *) echo "Usage: $0 {vmip|vlip|trip}" ;;
+esac
