@@ -121,7 +121,7 @@ EOF
 
 mkdir -p /etc/zivpn/api
 run_silent "Setting up API" \
-"wget -q https://raw.githubusercontent.com/welwel11/project2/main/zivpn-api.go -O /etc/zivpn/api/zivpn-api.go"
+"wget -q https://raw.githubusercontent.com/welwel11/project3/main/zivpn-api.go -O /etc/zivpn/api/zivpn-api.go"
 
 cd /etc/zivpn/api
 if go build -o zivpn-api zivpn-api.go &>/dev/null; then
