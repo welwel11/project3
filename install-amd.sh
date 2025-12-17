@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ╔════════════════════════════════════════════════════════════════════╗
-# ║        INSTALLER MODUL ZIVPN UDP                                  ║
+# ║        INSTALLER MODUL ZIVPN UDP                                 ║
 # ╚════════════════════════════════════════════════════════════════════╝
 
 # Warna untuk presentasi
@@ -63,15 +63,7 @@ fi
 
 # ╔════════════════════════════════════════════════════════════════╗
 print_section "MEMPERBARUI SISTEM"
-run_with_spinner "Memperbarui paket sistem" "apt-get update && apt-get upgrade -y"
-
-# ╔════════════════════════════════════════════════════════════════╗
-print_section "MENGINSTAL DEPENDENSI"
-if ! command -v jq &>/dev/null; then
-    run_with_spinner "jq belum terinstal, menginstal jq" "apt-get install -y jq"
-else
-    echo -e "${GREEN}jq sudah terinstal.${RESET}"
-fi
+run_with_spinner "Memperbarui paket sistem" "sudo apt-get update && sudo apt-get upgrade -y"
 
 # ╔════════════════════════════════════════════════════════════════╗
 print_section "MENGUNDUH ZIVPN UDP"
@@ -86,10 +78,7 @@ wget -q https://raw.githubusercontent.com/welwel11/project3/main/config.json -O 
 
 # ╔════════════════════════════════════════════════════════════════╗
 print_section "MEMBUAT SERTIFIKAT SSL"
-run_with_spinner "Membuat sertifikat SSL" \
-"openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
--subj '/C=US/ST=California/L=Los Angeles/O=Example Corp/OU=IT Department/CN=zivpn' \
--keyout /etc/zivpn/zivpn.key -out /etc/zivpn/zivpn.crt"
+run_with_spinner "Membuat sertifikat SSL" "openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 -subj '/C=US/ST=California/L=Los Angeles/O=Example Corp/OU=IT Department/CN=zivpn' -keyout /etc/zivpn/zivpn.key -out /etc/zivpn/zivpn.crt"
 
 # ╔════════════════════════════════════════════════════════════════╗
 print_section "MENGOPTIMALKAN PARAMETER SISTEM"
@@ -101,7 +90,8 @@ print_section "MEMBUAT LAYANAN SYSTEMD"
 if [ -f /etc/systemd/system/zivpn.service ]; then
     echo -e "${YELLOW}Layanan ZIVPN sudah ada. Pembuatan akan dilewati.${RESET}"
 else
-cat <<EOF > /etc/systemd/system/zivpn.service
+    echo -e "${CYAN}Mengonfigurasi layanan systemd...${RESET}"
+    cat <<EOF > /etc/systemd/system/zivpn.service
 [Unit]
 Description=ZIVPN UDP VPN Server
 After=network.target
@@ -124,14 +114,31 @@ EOF
 fi
 
 # ╔════════════════════════════════════════════════════════════════╗
+: '
+# ╔════════════════════════════════════════════════════════════════╗
+# print_section "MENGONFIGURASI KATA SANDI"
+# echo -e "${YELLOW}Masukkan kata sandi yang dipisahkan dengan koma (Ej: pass1,pass2)"
+# read -p "Kata sandi (bawaan: zivpn): " input_config
+
+# if [ -n "$input_config" ]; then
+#     IFS=',' read -r -a config <<< "$input_config"
+#     [ ${#config[@]} -eq 1 ] && config+=("${config[0]}")
+# else
+#     config=("zivpn")
+# fi
+
+# new_config_str="\"config\": [$(printf "\"%s\"," "${config[@]}" | sed 's/,$//')]"
+# sed -i -E "s/\"config\": ?.*/${new_config_str}/g" /etc/zivpn/config.json
+'
+
+# ╔════════════════════════════════════════════════════════════════╗
 print_section "MENJALANKAN DAN MENGAKTIFKAN LAYANAN"
-systemctl daemon-reload
 systemctl enable zivpn.service
 systemctl start zivpn.service
 
 # ╔════════════════════════════════════════════════════════════════╗
 print_section "MENGONFIGURASI IPTABLES DAN FIREWALL"
-iface=$(ip -4 route ls | awk '/default/ {print $5; exit}')
+iface=$(ip -4 route ls | grep default | grep -Po '(?<=dev )(\S+)' | head -1)
 if ! iptables -t nat -C PREROUTING -i "$iface" -p udp --dport 6000:19999 -j DNAT --to-destination :5667 &>/dev/null; then
     iptables -t nat -A PREROUTING -i "$iface" -p udp --dport 6000:19999 -j DNAT --to-destination :5667
 else
@@ -149,6 +156,8 @@ run_with_spinner "Mengunduh panel pengelolaan (menu-zivpn)" \
 
 # ╔════════════════════════════════════════════════════════════════╗
 print_section "MENGATUR AUTO MENU SETELAH LOGIN"
+
+# Auto buka menu-zivpn saat login root
 if ! grep -q "menu-zivpn" /root/.bashrc 2>/dev/null; then
 cat >> /root/.bashrc << 'EOF'
 
@@ -163,6 +172,7 @@ fi
 
 # ╔════════════════════════════════════════════════════════════════╗
 print_section "SELESAI"
+rm -f install-amd.sh install-amd.tmp install-amd.log &>/dev/null
 echo -e "${GREEN}ZIVPN UDP berhasil diinstal.${RESET}"
 echo -e "${GREEN}Menu akan terbuka otomatis setelah login / reboot.${RESET}"
 echo -e "${GREEN}Atau jalankan manual dengan perintah ${CYAN}menu-zivpn${GREEN}.${RESET}"
