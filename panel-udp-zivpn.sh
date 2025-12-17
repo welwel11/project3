@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ╔════════════════════════════════════════════════════════════════════════════╗
-# ║                    🧩 ZIVPN - UDP USER PANEL - v1.0                       ║
+# ║                     ZIVPN  UDP USER PANEL                       ║
 # ╚════════════════════════════════════════════════════════════════════════════╝
 
 # 📁 Files
@@ -206,17 +206,17 @@ while true; do
   [[ "$ARCH" =~ arm|aarch ]] && ARCH_DISPLAY="ARM" || ARCH_DISPLAY="AMD"
 
   echo -e "\n${CYAN}╔═════════════════════════════════════════════════════════════════╗"
-  echo -e "║                🧩 ZIVPN - UDP USER PANEL                        ║"
+  echo -e "║                     ZIVPN - UDP USER PANEL                        ║"
   echo -e "╠═════════════════════════════════════════════════════════════════╣"
-  echo -e "║ [1] ➕  Create new user (with expiration)                        ║"
-  echo -e "║ [2] ❌  Remove user                                              ║"
-  echo -e "║ [3] 🗓  Renew user                                               ║"
-  echo -e "║ [4] 📋  List users                                               ║"
-  echo -e "║ [5] ▶️  Start service                                            ║"
-  echo -e "║ [6] 🔁  Restart service                                          ║"
-  echo -e "║ [7] ⏹️  Stop service                                             ║"
-  echo -e "║ [8] 🧹  Toggle auto-clean expired users                          ║"
-  echo -e "║ [9] 🚪  Exit                                                     ║"
+  echo -e "║ [1]. BUAT AKUN  ZIVPN                      ║"
+  echo -e "║ [2]. HAPUS AKUN ZIVPN                                             ║"
+  echo -e "║ [3]. PERPANJANG AKUN ZIVPN                                              ║"
+  echo -e "║ [4]. DAFTAR PENGGUNA ZIVPN                                               ║"
+  echo -e "║ [5]. MULAI SERVICE                                            ║"
+  echo -e "║ [6]. RESTART SERVICE                                          ║"
+  echo -e "║ [7]. STOP SERVICE                                             ║"
+  echo -e "║ [8]. HAPUS AKUN EXPIRED                          ║"
+  echo -e "║ [9]. KELUAR                                                     ║"
   echo -e "╚═════════════════════════════════════════════════════════════════╝${RESET}"
 
   read -p "📌 Select an option: " opc
